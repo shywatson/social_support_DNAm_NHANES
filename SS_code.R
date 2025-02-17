@@ -2,6 +2,7 @@
 ####   block 0: set directory
 ####################################################################################################
 rm(list=ls())
+set.seed(65327482)
 setwd("~/Desktop/SS_code_for_share/")
 require("survey")
 require("openxlsx")
@@ -62,7 +63,7 @@ clock_list <- c("HannumAge","HorvathAge","WeidnerAge","LinAge","VidalBraloAge",
 # clock_list <- c("GDF15Mort","B2MMort","CystatinCMort","TIMP1Mort","ADMMort","PAI1Mort","LeptinMort",
 #                 "PACKYRSMort","CRPMort","logA1CMort")
 
-#supplementary bio markers
+# supplementary bio markers
 if ("CystatinCMort" %in% clock_list){namelist <- "supplementary biomarkers"} else {namelist <- "main"}
 
 
@@ -171,6 +172,18 @@ analysis$overallSample<- 0
 analysis$overallSample[!is.na(analysis$HorvathAge)] <- 1
 table(analysis$overallSample,useNA = "a")
 tapply(analysis$WTDN4YR,analysis$overallSample,median,na.rm=T)
+
+# Create Z-SCORE for GrimAge2 variables
+for (clock in c("GDF15Mort","B2MMort","CystatinCMort","TIMP1Mort","ADMMort","PAI1Mort","LeptinMort",
+                "PACKYRSMort","CRPMort","logA1CMort")){
+  #clock <- "GDF15Mort"
+  print(clock)
+  print(range(analysis[,clock],na.rm=T))
+  tempmean <- mean(analysis[,clock],na.rm=T)
+  tempsd <- sd(analysis[,clock],na.rm=T)
+  analysis[,clock] <- (analysis[,clock]- tempmean)/tempsd
+  print(range(analysis[,clock],na.rm=T))
+}
 ####################################################################################################
 
 
@@ -479,6 +492,8 @@ saveWorkbook(wb, file=paste0("Results/Table 1",format(Sys.Date(),"_%m_%d_%Y"), "
 ####    block 6: SS analysis models
 ####################################################################################################
 table(rawanalysis$anyoneSS,rawanalysis$age>=60,useNA = "a")
+table(paste0(rawanalysis_multiimpu$nonSmoker,rawanalysis_multiimpu$packyrs0,rawanalysis_multiimpu$packyrslt30,
+             rawanalysis_multiimpu$packyrs30_59,rawanalysis_multiimpu$packyrs60),useNA = "a")
 
 ####################################################################################################
 ##  block 6.0: Subgroup analysis
@@ -703,7 +718,9 @@ for (S_pp in subgroup_SS){
       summary(med.fit)
       
       #### mediator_outcome model
-      med_out.fit <- survreg(as.formula(paste0("Surv(deathage,dead)~",clock,cov_list)), dist="weibull",data=rawanalysis)
+      med_out.fit <- survey::svysurvreg(design=explore_surveydata,
+                                        as.formula(paste0("Surv(deathage,dead)~",clock,
+                                                          cov_list)), dist="weibull")
       summary(med_out.fit)
       
       #### outcome model without and with mediators
@@ -1032,7 +1049,8 @@ for (tt in c("blackwomen","blackmen","whitewomen","whitemen","mexicanwomen","mex
   i=1;descriptive_categorical <- NULL
 
   for (var in variable_list_sample_categorical){
-    #var="noneedmoreSS"
+    # var="noneedmoreSS"
+    
     explore_dataset <- get("rawanalysis_multiimpu") ## get imputed dataset
     # explore_dataset <- get("rawanalysis") ## get completed cases dataset
 
@@ -1185,14 +1203,14 @@ for (tt in SS_tablelist){
             rowNames = F)
 }
 
-ll <- p.adjust(p_adjust_list, method = "fdr", n = length(p_adjust_list))
-p_adjust_list[ll<=0.05]
-(1:1404)[ll<=0.05]
-p_adjust_namelist[ll<=0.05]
-hist(p_adjust_list)
+# ll <- p.adjust(p_adjust_list, method = "fdr", n = length(p_adjust_list))
+# p_adjust_list[ll<0.05]
+# (1:1404)[ll<0.05]
+# p_adjust_namelist[ll<0.05]
+# hist(p_adjust_list)
 #ll[p_adjust_namelist=="HavefriendSS_blackmen_WeidnerAge"]
 #ll[p_adjust_namelist=="HavefriendSS_blackmen_SkinBloodAge"]
-#range(ll);table(ll<=0.05)
+#range(ll);table(ll<0.05)
 
 
 
@@ -1223,6 +1241,36 @@ hist(p_adjust_list)
   addWorksheet(wb, "Survival")
   writeData(wb,x=dataforplots_final,sheet = "Survival",
             rowNames = F)
+  
+  
+  dataformediator_final <- NULL
+  for (S_pp in SS_tablelistPP){
+    #S_pp <- "blackwomen"
+    
+    dataformediator <- NULL
+    for (i in 1:length(clock_list)){
+      #i=1;i=13
+      print(i)
+      print(clock_list[i])
+      work <-  readxl::read_excel(paste0("Results/survival model for SS anyoneSS among ",S_pp," participants ",namelist,
+                                         format(Sys.Date(),"_%m_%d_%Y"), ".xlsx"),
+                                  sheet = i)
+      work <- as.data.frame(work[74,c(4:6,7)])
+      names(work) <- c("HR","HR_lowCI","HR_highCI","clock")
+      
+      dataformediator <- rbind(dataformediator,work)
+    }
+    dataformediator$set <- S_pp
+    dataformediator$gap <- NA
+    
+    if (is.null(dataformediator_final)){
+      dataformediator_final <- dataformediator
+    } else {dataformediator_final<- cbind(dataformediator_final,dataformediator)}
+  }
+  addWorksheet(wb, paste0("mediator_survival"))
+  writeData(wb,x=dataformediator_final,sheet = paste0("mediator_survival"),
+            rowNames = F)
+  
 saveWorkbook(wb, file=paste0("Results/model",j," print tables.xlsx"), overwrite = T)
 ####################################################################################################
 
