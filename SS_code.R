@@ -11,6 +11,8 @@ require("Hmisc")
 require("haven")
 require("ggplot2")
 require("gridExtra")
+require("car")
+library("compositions")
 
 extract_mediation_summary <- function (x) {
   
@@ -161,6 +163,15 @@ nhBioA$Havelt5friendSS[!is.na(nhBioA$Have5friendSS)] <- 0
 nhBioA$Havelt5friendSS[nhBioA$Have5friendSS==0] <- 1
 table(nhBioA$Have5friendSS,nhBioA$Havelt5friendSS,useNA = "a")
 
+nhBioA$SNI <- nhBioA$married + nhBioA$anyoneSS +
+  nhBioA$anyonefinSS + nhBioA$Have5friendSS
+table(nhBioA$SNI)
+nhBioA$SNI_1above <- NA
+nhBioA$SNI_1above[nhBioA$SNI %in% c(0,1)] <- 0
+nhBioA$SNI_1above[nhBioA$SNI %in% c(2:4)] <- 1
+table(nhBioA$SNI_1above)
+
+
 ####################################################################################################
 # Load DNA methylation data
 DNAm_Meta <- read_sas("dnmepi.sas7bdat")
@@ -185,7 +196,17 @@ for (clock in c("GDF15Mort","B2MMort","CystatinCMort","TIMP1Mort","ADMMort","PAI
   print(range(analysis[,clock],na.rm=T))
 }
 ####################################################################################################
-
+table(analysis$lbxlypct+analysis$lbxmopct+analysis$lbxnepct+analysis$lbxeopct+analysis$lbxbapct)
+range(analysis$lbxnepct,na.rm = T);mean(analysis$lbxnepct,na.rm = T);sd(analysis$lbxnepct,na.rm = T)
+range(analysis$lbxlypct,na.rm = T);mean(analysis$lbxlypct,na.rm = T);sd(analysis$lbxlypct,na.rm = T)
+range(analysis$lbxmopct,na.rm = T);mean(analysis$lbxmopct,na.rm = T);sd(analysis$lbxmopct,na.rm = T)
+range(analysis$lbxeopct,na.rm = T);mean(analysis$lbxeopct,na.rm = T);sd(analysis$lbxeopct,na.rm = T)
+range(analysis$lbxbapct,na.rm = T);mean(analysis$lbxbapct,na.rm = T);sd(analysis$lbxbapct,na.rm = T)#### the highest catogery
+comp_data <- with(analysis, cbind(lbxnepct, lbxlypct, lbxmopct, lbxeopct, lbxbapct))
+comp_data_acomp <- acomp(comp_data)
+ilr_data <- as.data.frame(ilr(comp_data_acomp))
+names(ilr_data) <- paste0("ilr_",c(1:4))
+analysis <- cbind(analysis, ilr_data)
 
 ####################################################################################################
 ####    block 2: multiple imputation data
@@ -200,8 +221,8 @@ multiimpu_analysis$sedentary <- ifelse(multiimpu_analysis$active==0,1,0)
 multiimpu_analysis$men <- NA
 multiimpu_analysis$men <- ifelse(multiimpu_analysis$women==0,1,0)
 multiimpu_analysis <- merge(multiimpu_analysis,analysis[,c("seqn","WTDN4YR","sdmvpsu","sdmvstra","overallSample",clock_list,
-                                                           "dead","ucod_113","deathage",
-                                                           "blackmen","blackwomen","whitemen","whitewomen","mexicanmen","mexicanwomen")],
+                                                           "dead","ucod_113","deathage", "cancer","cvd","diabetes",
+                                                           "blackwomen","blackmen","whitewomen","whitemen","mexicanwomen","mexicanmen","otherRE")],
                             all=T,by="seqn")
 # interaction smoking
 table(paste0(multiimpu_analysis$hei_quantile1,multiimpu_analysis$hei_quantile2,multiimpu_analysis$hei_quantile3,
@@ -232,6 +253,21 @@ table(paste0(analysis$nonSmoker_interref,analysis$formerSmoker_packyrslt30,analy
              analysis$formerSmoker_packyrs60,analysis$currentSmoker_packyrslt30,
              analysis$currentSmoker_packyrs30_59,analysis$currentSmoker_packyrs60))
 multiimpu_analysis$nonSmoker_interref <- multiimpu_analysis$nonSmoker
+
+multiimpu_analysis$SNI <- multiimpu_analysis$married + multiimpu_analysis$anyoneSS +
+  multiimpu_analysis$anyonefinSS + multiimpu_analysis$Have5friendSS
+table(multiimpu_analysis$SNI,useNA = "a")
+multiimpu_analysis$SNI_1above <- NA
+multiimpu_analysis$SNI_1above[multiimpu_analysis$SNI %in% c(0,1)] <- 0
+multiimpu_analysis$SNI_1above[multiimpu_analysis$SNI %in% c(2:4)] <- 1
+table(multiimpu_analysis$SNI_1above)
+
+comp_data <- with(multiimpu_analysis, cbind(lbxnepct, lbxlypct, lbxmopct, lbxeopct, lbxbapct))
+comp_data_acomp <- acomp(comp_data)
+ilr_data <- as.data.frame(ilr(comp_data_acomp))
+names(ilr_data) <- paste0("ilr_",c(1:4))
+multiimpu_analysis <- cbind(multiimpu_analysis, ilr_data)
+
 ###################################################################################################
 
 
@@ -241,13 +277,13 @@ multiimpu_analysis$nonSmoker_interref <- multiimpu_analysis$nonSmoker
 rawanalysis <- analysis[analysis$overallSample==1&!is.na(analysis$overallSample),]
 rawanalysis <- rawanalysis[rawanalysis$age>=60&rawanalysis$age<85,]
 rawanalysis <- rawanalysis[!rawanalysis$WTDN4YR==0,]
-rawanalysis <- rawanalysis[rawanalysis$otherRE==0,]
+#rawanalysis <- rawanalysis[rawanalysis$otherRE==0,]
 dim(rawanalysis)
 
 rawanalysis_multiimpu <- multiimpu_analysis[multiimpu_analysis$overallSample==1&!is.na(multiimpu_analysis$overallSample),]
 rawanalysis_multiimpu <- rawanalysis_multiimpu[rawanalysis_multiimpu$age>=60&rawanalysis_multiimpu$age<85,]
 rawanalysis_multiimpu <- rawanalysis_multiimpu[!rawanalysis_multiimpu$WTDN4YR==0,]
-rawanalysis_multiimpu <- rawanalysis_multiimpu[rawanalysis_multiimpu$race %in% c(1:3),]
+#rawanalysis_multiimpu <- rawanalysis_multiimpu[rawanalysis_multiimpu$race %in% c(1:3),]
 dim(rawanalysis_multiimpu)
 ####################################################################################################
 
@@ -261,7 +297,7 @@ svyNHE <- svydesign(id = ~sdmvpsu , strata = ~sdmvstra , nest = TRUE ,
 svyNHEanalysis <- subset(svyNHE,overallSample==1&!is.na(overallSample))
 svyNHEanalysis <- subset(svyNHEanalysis,age<85)
 svyNHEanalysis <- subset(svyNHEanalysis,age>=60)
-svyNHEanalysis <- subset(svyNHEanalysis,otherRE==0)
+#svyNHEanalysis <- subset(svyNHEanalysis,otherRE==0)
 dim(svyNHEanalysis$variables)
 
 
@@ -271,9 +307,10 @@ svyNHE_multiimpu <- svydesign(id = ~sdmvpsu , strata = ~sdmvstra , nest = TRUE ,
 svyNHEanalysis_multiimpu <- subset(svyNHE_multiimpu,overallSample==1&!is.na(overallSample))
 svyNHEanalysis_multiimpu <- subset(svyNHEanalysis_multiimpu,age<85)
 svyNHEanalysis_multiimpu <- subset(svyNHEanalysis_multiimpu,age>=60)
-svyNHEanalysis_multiimpu <- subset(svyNHEanalysis_multiimpu,race %in% c(1:3))
+#svyNHEanalysis_multiimpu <- subset(svyNHEanalysis_multiimpu,race %in% c(1:3))
 dim(svyNHEanalysis_multiimpu$variables)
 ####################################################################################################
+
 
 
 ####################################################################################################
@@ -281,7 +318,7 @@ dim(svyNHEanalysis_multiimpu$variables)
 ####################################################################################################
 
 ####################################################################################################
-## block 5.1: sample descriptive for categorical variables without missing
+## block 5.1: sample descriptive for categorical variables without miSNIng
 ####################################################################################################
 table(rawanalysis$nonSmoker_interref ,rawanalysis$nonSmoker,useNA = "a")
 variable_list_sample_categorical <- c("white","black","mexican","",
@@ -462,7 +499,7 @@ for (var in variable_list_sample_continuous){
   temp_4 <- cbind(var,as.data.frame(temp_0),
                   as.data.frame(temp_1),as.data.frame(temp_2),
                   t(as.data.frame(temp_3)),table(is.na(explore_dataset[,var]))[1])
-  
+   
   svytt <- as.data.frame(svytotal(design=explore_surveydata,make.formula(var),na.rm=T))
   names(svytt)[2] <- "total_se"
   svyper <- as.data.frame(svymean(design=explore_surveydata,make.formula(var),na.rm = T))
@@ -498,11 +535,12 @@ table(paste0(rawanalysis_multiimpu$nonSmoker,rawanalysis_multiimpu$packyrs0,rawa
 ####################################################################################################
 ##  block 6.0: Subgroup analysis
 ####################################################################################################
-subgroup_SS <- c("blackmen","blackwomen","whitemen","whitewomen","mexicanmen","mexicanwomen")
-SSvar_list <- c("anyoneSS","noneedmoreSS","HavefriendSS","Have5friendSS","anyonefinSS","married")
+subgroup_SS <- c("blackwomen","blackmen","whitewomen","whitemen","mexicanwomen","mexicanmen",
+                 "overallSample","women","men","black","white","mexican","otherRE")
+SSvar_list <- c("anyoneSS","noneedmoreSS","HavefriendSS","Have5friendSS","anyonefinSS","married","SNI_1above")
 
 for (S_pp in subgroup_SS){
-  #S_pp <- "whitewomen"；S_pp <- "mexicanmen"
+  #S_pp <- "otherRE"；S_pp <- "mexicanmen"
   print(S_pp)
  
   explore_surveydata <- get("svyNHEanalysis_multiimpu")  ## get imputed survey object
@@ -538,7 +576,7 @@ for (S_pp in subgroup_SS){
       model_0_coef_SS$label <- rownames(model_0_coef_SS)
 
       #### model 1
-      model_1_SS <- svyglm(design=explore_surveydata,paste0(clock,"~",SSvar,"+women+age+agesq +forborn"),family="gaussian")
+      model_1_SS <- svyglm(design=explore_surveydata,paste0(clock,"~",SSvar,"+age+agesq +forborn"),family="gaussian")
       summary(model_1_SS, df.resid=Inf)
       model_1_coef_SS <-  as.data.frame(rbind(c(summary(model_1_SS, df.resid=Inf)$df.null+1,NA,NA,NA),
                                               cbind(coef(summary(model_1_SS, df.resid=Inf))[,1],
@@ -549,7 +587,7 @@ for (S_pp in subgroup_SS){
       model_1_coef_SS$label <- rownames(model_1_coef_SS)
 
       #### model 2
-      model_2_SS <- svyglm(design=explore_surveydata,paste0(clock,"~",SSvar,"+women+age+agesq +forborn+
+      model_2_SS <- svyglm(design=explore_surveydata,paste0(clock,"~",SSvar,"+age+agesq +forborn+
                             lths+hs+somecoll+  pir_below1+pir_1_2+pir_2_5+
                             lowwhite+hiblue+lowblue+nowork"),family="gaussian")
       summary(model_2_SS, df.resid=Inf)
@@ -562,7 +600,7 @@ for (S_pp in subgroup_SS){
       model_2_coef_SS$label <- rownames(model_2_coef_SS)
 
       #### model 3
-      model_3_SS <- svyglm(design=explore_surveydata,paste0(clock,"~",SSvar,"+women+age+agesq +forborn+
+      model_3_SS <- svyglm(design=explore_surveydata,paste0(clock,"~",SSvar,"+age+agesq +forborn+
                             lths+hs+somecoll+  pir_below1+pir_1_2+pir_2_5+
                             lowwhite+hiblue+lowblue+nowork+
                             abstainer+
@@ -580,7 +618,7 @@ for (S_pp in subgroup_SS){
       model_3_coef_SS$label <- rownames(model_3_coef_SS)
 
       #### model 4
-      model_4_SS <- svyglm(design=explore_surveydata,paste0(clock,"~",SSvar,"+women+age+agesq +forborn+
+      model_4_SS <- svyglm(design=explore_surveydata,paste0(clock,"~",SSvar,"+age+agesq +forborn+
                             lths+hs+somecoll+  pir_below1+pir_1_2+pir_2_5+
                             lowwhite+hiblue+lowblue+nowork+
                             abstainer+
@@ -588,8 +626,11 @@ for (S_pp in subgroup_SS){
                             hei_quantile1+hei_quantile2+hei_quantile3+hei_quantile4+
                             formerSmoker_packyrslt30+formerSmoker_packyrs30+
                             currentSmoker_packyrslt30+currentSmoker_packyrs30+
-                            lbxlypct+lbxmopct+lbxnepct+lbxeopct+lbxbapct
+                            ilr_1+ilr_2+ilr_3+ilr_4
                             "),family="gaussian")
+      #cancer+cvd+diabetes
+      #lbxlypct+lbxmopct+lbxeopct+lbxbapct+lbxnepct
+      #ilr_1+ilr_2+ilr_3+ilr_4
       summary(model_4_SS, df.resid=Inf)
       model_4_coef_SS <-  as.data.frame(rbind(c(summary(model_4_SS, df.resid=Inf)$df.null+1,NA,NA,NA),
                                               cbind(coef(summary(model_4_SS, df.resid=Inf))[,1],
@@ -676,6 +717,7 @@ for (S_pp in subgroup_SS){
       dataforplots$sign <- ""
       dataforplots$coef_pvalue <- as.numeric(dataforplots$coef_pvalue)
       dataforplots$sign[dataforplots$coef_pvalue<(0.05/(6*6))&!is.na(dataforplots$coef_pvalue)] <- "**"
+      dataforplots$sign2[dataforplots$coef_pvalue<(0.05)&!is.na(dataforplots$coef_pvalue)] <- "*"
 
       print(ggplot(data=dataforplots,aes(x=clock,y=model_coef))+
               #ylim(limit_y)+
@@ -686,7 +728,8 @@ for (S_pp in subgroup_SS){
               scale_color_manual(values = c("black","orange","blue","red"))+ geom_hline(yintercept = 0)+
               geom_vline(xintercept = 8,color="purple",linetype="dashed")+geom_vline(xintercept = 14,color="purple",linetype="dashed")+
               labs(y="Model coefficients") + theme(axis.text.x = element_text(angle=30,hjust = 1))+
-              geom_text(aes(label=sign), position=position_dodge(width=0.9),  hjust=-0.5,color="red")  )
+              geom_text(aes(y=coef_highCI,label=sign), vjust=-0.01, color="red",size = 10)+
+              geom_text(aes(y=coef_highCI,label=sign2), vjust=-0.01, color="red",size = 10) )
     }
   }
   dev.off()
@@ -706,11 +749,12 @@ for (S_pp in subgroup_SS){
       #clock <- "HannumAge"; clock <- "HorvathTelo"; clock <- "LinAge"
 
       cov_list <- "+age+agesq +forborn+lths+hs+somecoll+  pir_below1+pir_1_2+pir_2_5+
-      lowwhite+hiblue+lowblue+nowork+drinker+active+
-      hei_quantile1+hei_quantile2+hei_quantile3+hei_quantile4+
-      formerSmoker_packyrslt30+formerSmoker_packyrs30+
-      currentSmoker_packyrslt30+currentSmoker_packyrs30"
-      #+lbxlypct+lbxmopct+lbxnepct+lbxeopct+lbxbapct
+      lowwhite+hiblue+lowblue+nowork      +drinker+active+
+        hei_quantile1+hei_quantile2+hei_quantile3+hei_quantile4+
+        formerSmoker_packyrslt30+formerSmoker_packyrs30+
+        currentSmoker_packyrslt30+currentSmoker_packyrs30"
+      #cancer+cvd+diabetes
+      #ilr_1+ilr_2+ilr_3+ilr_4
       
       print(clock)
       #### mediator model
@@ -1045,7 +1089,7 @@ rawanalysis_multiimpu$Havelt5friendSS[rawanalysis_multiimpu$Have5friendSS==0] <-
 rawanalysis_multiimpu$NoonefinSS <- 0
 rawanalysis_multiimpu$NoonefinSS[rawanalysis_multiimpu$anyonefinSS==0] <- 1
 
-for (tt in c("blackwomen","blackmen","whitewomen","whitemen","mexicanwomen","mexicanmen")){
+for (tt in c("overallSample","blackwomen","blackmen","whitewomen","whitemen","mexicanwomen","mexicanmen")){
   i=1;descriptive_categorical <- NULL
 
   for (var in variable_list_sample_categorical){
@@ -1105,7 +1149,7 @@ variable_list_sample_continuous <- c("age","agesq","lbxlypct","lbxmopct","lbxnep
 ## descriptive tables
 descriptive_continuous_bygroup <- as.data.frame(variable_list_sample_continuous)
 
-for (tt in c("blackwomen","blackmen","whitewomen","whitemen",
+for (tt in c("overallSample","blackwomen","blackmen","whitewomen","whitemen",
              "mexicanwomen","mexicanmen")){
   i=1; descriptive_continuous <- NULL
   for (var in variable_list_sample_continuous){
@@ -1156,13 +1200,13 @@ saveWorkbook(wb, file=paste0("Results/Table 1",
 ####################################################################################################
 ##  block 6.8: printing out tables for SS
 ####################################################################################################
-SS_tablelist <- c("anyoneSS","noneedmoreSS","HavefriendSS","Have5friendSS","anyonefinSS","married")
-SS_tablelistPP <- c("blackwomen","blackmen","whitewomen","whitemen",
-                      "mexicanwomen","mexicanmen")
+SS_tablelist <- c("anyoneSS","noneedmoreSS","HavefriendSS","Have5friendSS","anyonefinSS","married","SNI_1above")
+SS_tablelistPP <- c("blackwomen","blackmen","whitewomen","whitemen","mexicanwomen","mexicanmen",
+                    "overallSample","women","men","black","white","mexican","otherRE")
 
 wb <- createWorkbook()
-p_adjust_namelist <- c()
-p_adjust_list <- c()
+# p_adjust_namelist <- c()
+# p_adjust_list <- c()
 for (tt in SS_tablelist){
   #tt <- "anyoneSS"
   dataforplots_final <- NULL
@@ -1171,7 +1215,7 @@ for (tt in SS_tablelist){
     #S_pp <- "blackwomen"
 
     for (j in c(4)){
-      #j=4;5
+      #j=3,4,5
       dataforplots <-NULL
 
       for (i in 1:length(clock_list)){
@@ -1180,12 +1224,13 @@ for (tt in SS_tablelist){
         print(clock_list[i])
         work <-  readxl::read_excel(paste0("Results/SS (",tt,") associated with clocks among ",S_pp," participants ",namelist,
                                            format(Sys.Date(),"_%m_%d_%Y"), ".xlsx"),sheet = i)
+        
         work <- as.data.frame(work[3,])
 
-        p_adjust_list <- c(p_adjust_list,as.numeric(work[,6+(j-1)*4]))
-        p_adjust_namelist <- c(p_adjust_namelist,paste0(tt,"_",S_pp,"_",clock_list[i]))
-        temp <- work[,c(1,2,3+(j-1)*4,4+(j-1)*4,5+(j-1)*4)]
-        names(temp) <- c("SSexposure","order","model_coef","coef_lowCI","coef_highCI")
+        #p_adjust_list <- c(p_adjust_list,as.numeric(work[,6+(j-1)*4]))
+        #p_adjust_namelist <- c(p_adjust_namelist,paste0(tt,"_",S_pp,"_",clock_list[i]))
+        temp <- work[,c(1,2,3+(j-1)*4,4+(j-1)*4,5+(j-1)*4,6+(j-1)*4)]
+        names(temp) <- c("SSexposure","order","model_coef","coef_lowCI","coef_highCI","p_value")
         temp$clock <- clock_list[i]
 
         dataforplots <- rbind(dataforplots,temp)
@@ -1224,6 +1269,7 @@ for (tt in SS_tablelist){
       #tt <- "anyoneSS"
         work <-  readxl::read_excel(paste0("Results/survival model for SS ",tt," among ",S_pp," participants ",namelist,
                                            format(Sys.Date(),"_%m_%d_%Y"), ".xlsx"),sheet = 1)
+        
         work <- as.data.frame(work[45,])
         work <- work[,c(4:6)]
         names(work) <- c("HR","HR_lowCI","HR_highCI")
@@ -1271,7 +1317,7 @@ for (tt in SS_tablelist){
   writeData(wb,x=dataformediator_final,sheet = paste0("mediator_survival"),
             rowNames = F)
   
-saveWorkbook(wb, file=paste0("Results/model",j," print tables.xlsx"), overwrite = T)
+saveWorkbook(wb, file=paste0("Results/model_",(j-1)," print tables.xlsx"), overwrite = T)
 ####################################################################################################
 
 
