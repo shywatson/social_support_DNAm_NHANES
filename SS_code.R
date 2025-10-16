@@ -76,7 +76,48 @@ tt_tic <- proc.time()
 ####################################################################################################
 ####    block 1: loading datasets
 ####################################################################################################
-nhBioA <- read.csv("Raw_clean_SS_11_24_2024.csv")
+nhBioA <- read.csv("Raw_clean_SS_10_25_2025.csv")
+
+table(nhBioA$CRP,useNA = "a")
+table(nhBioA$albumin,useNA = "a")
+table(nhBioA$HDL,useNA = "a")
+table(nhBioA$LDL,useNA = "a")
+table(nhBioA$BMI,useNA = "a")
+table(nhBioA$Triglycerides,useNA = "a")
+table(nhBioA$active,useNA = "a")
+table(nhBioA$Systolic,useNA = "a")
+table(nhBioA$sysmean,useNA = "a")
+table(nhBioA$Diastolic,useNA = "a")
+table(nhBioA$diamean,useNA = "a")
+table(nhBioA$lbxsgl,useNA = "a")
+table(nhBioA$poverty,useNA = "a")
+table(nhBioA$smokeNow,useNA = "a")
+table(nhBioA$abstainer,useNA = "a")
+table(nhBioA$lths,useNA = "a")
+
+quantile(nhBioA$sysmean,na.rm = T,probs = c(0.75))
+nhBioA$sysrisk <- ifelse(nhBioA$sysmean>=quantile(nhBioA$sysmean,na.rm = T,probs = c(0.75)),1,0)
+table(nhBioA$sysrisk,useNA = "a")
+nhBioA$diarisk <- ifelse(nhBioA$diamean>=quantile(nhBioA$diamean,na.rm = T,probs = c(0.75)),1,0)
+table(nhBioA$diarisk,useNA = "a")
+nhBioA$bmirisk <- ifelse(nhBioA$BMI>=quantile(nhBioA$BMI,na.rm = T,probs = c(0.75)),1,0)
+table(nhBioA$bmirisk,useNA = "a")
+nhBioA$tcrisk <- ifelse(nhBioA$lbdschsi>=quantile(nhBioA$lbdschsi,na.rm = T,probs = c(0.75)),1,0)
+table(nhBioA$tcrisk,useNA = "a")
+nhBioA$hba1crisk <- ifelse(nhBioA$lbxsgl>=quantile(nhBioA$lbxsgl,na.rm = T,probs = c(0.75)),1,0)
+table(nhBioA$hba1crisk,useNA = "a")
+
+nhBioA$trigrisk <- ifelse(nhBioA$Triglycerides>=quantile(nhBioA$Triglycerides,na.rm = T,probs = c(0.75)),1,0)
+table(nhBioA$trigrisk,useNA = "a")
+nhBioA$hdlrisk <- ifelse(nhBioA$HDL>=quantile(nhBioA$HDL,na.rm = T,probs = c(0.75)),1,0)
+table(nhBioA$hdlrisk,useNA = "a")
+nhBioA$creatrisk <- ifelse(nhBioA$lbdscrsi>=quantile(nhBioA$lbdscrsi,na.rm = T,probs = c(0.75)),1,0)
+table(nhBioA$creatrisk,useNA = "a")
+nhBioA$albrisk <- ifelse(nhBioA$albumin>=quantile(nhBioA$albumin,na.rm = T,probs = c(0.75)),1,0)
+table(nhBioA$albrisk,useNA = "a")
+nhBioA$crprisk <- ifelse(nhBioA$CRP>=quantile(nhBioA$CRP,na.rm = T,probs = c(0.75)),1,0)
+table(nhBioA$crprisk,useNA = "a")
+
 
 # Creat death age
 nhBioA$deathage <- nhBioA$permth_int/12+ nhBioA$age
@@ -171,6 +212,10 @@ nhBioA$SNI_1above[nhBioA$SNI %in% c(0,1)] <- 0
 nhBioA$SNI_1above[nhBioA$SNI %in% c(2:4)] <- 1
 table(nhBioA$SNI_1above)
 
+nhBioA$SNI_2above <- NA
+nhBioA$SNI_2above[nhBioA$SNI %in% c(0,1,2)] <- 0
+nhBioA$SNI_2above[nhBioA$SNI %in% c(3:4)] <- 1
+table(nhBioA$SNI_2above)
 
 ####################################################################################################
 # Load DNA methylation data
@@ -207,6 +252,20 @@ comp_data_acomp <- acomp(comp_data)
 ilr_data <- as.data.frame(ilr(comp_data_acomp))
 names(ilr_data) <- paste0("ilr_",c(1:4))
 analysis <- cbind(analysis, ilr_data)
+
+analysis$CSI <- analysis$poverty+analysis$lths+analysis$sedentary+analysis$smokeNow+analysis$drinker+
+  analysis$sysrisk+analysis$diarisk+analysis$tcrisk+analysis$bmirisk+analysis$hba1crisk 
+table(analysis$CSI,useNA = "a")
+analysis$CSIbi[!is.na(analysis$CSI)] <- 0
+analysis$CSIbi[analysis$CSI>=5] <- 1
+table(analysis$CSIbi,useNA = "a")
+analysis$AL <- analysis$sysrisk+analysis$diarisk+analysis$tcrisk+analysis$bmirisk+analysis$hba1crisk+
+  analysis$creatrisk+analysis$crprisk+analysis$albrisk+analysis$hdlrisk+analysis$trigrisk
+table(analysis$AL,useNA = "a")
+analysis$ALbi[!is.na(analysis$AL)] <- 0
+analysis$ALbi[analysis$AL>=3] <- 1
+table(analysis$ALbi,useNA = "a")
+
 
 ####################################################################################################
 ####    block 2: multiple imputation data
@@ -262,6 +321,11 @@ multiimpu_analysis$SNI_1above[multiimpu_analysis$SNI %in% c(0,1)] <- 0
 multiimpu_analysis$SNI_1above[multiimpu_analysis$SNI %in% c(2:4)] <- 1
 table(multiimpu_analysis$SNI_1above)
 
+multiimpu_analysis$SNI_2above <- NA
+multiimpu_analysis$SNI_2above[multiimpu_analysis$SNI %in% c(0,1,2)] <- 0
+multiimpu_analysis$SNI_2above[multiimpu_analysis$SNI %in% c(3:4)] <- 1
+table(multiimpu_analysis$SNI_2above)
+
 comp_data <- with(multiimpu_analysis, cbind(lbxnepct, lbxlypct, lbxmopct, lbxeopct, lbxbapct))
 comp_data_acomp <- acomp(comp_data)
 ilr_data <- as.data.frame(ilr(comp_data_acomp))
@@ -287,6 +351,22 @@ rawanalysis_multiimpu <- rawanalysis_multiimpu[!rawanalysis_multiimpu$WTDN4YR==0
 dim(rawanalysis_multiimpu)
 ####################################################################################################
 
+tcorrelation <- rcorr(as.matrix(rawanalysis[,c(clock_list,"CSI","CSIbi","AL","ALbi")]))
+tcorrelation_write <- as.matrix(tcorrelation$r)
+library(ggcorrplot)
+pdf(paste0("Results/correlation plot",format(Sys.Date(),"_%m_%d_%Y"),".pdf"),
+    width = 10,height = 5)
+ggcorrplot(tcorrelation_write, type = "lower", lab_size = 1.5, lab=T, 
+           colors = c("#6D9EC1", "white", "#E46726"))+ theme_classic() +
+  theme(
+    axis.text.x = element_text(angle = 30, hjust = 1,size=5),  # Rotate x-axis labels
+    axis.text.y.right = element_text(size=5),  # Right y-axis labels
+    axis.ticks.y.right = element_line(),
+    plot.margin = margin(5.5, 20, 5.5, 5.5)
+  ) + scale_y_discrete(position = "right")+
+  guides(fill = guide_colorbar(title = "Correlation coefficients"))+
+  labs(fill = "Correlation", x = NULL, y = NULL)
+dev.off()
 
 ####################################################################################################
 ####    block 4: survey data for final estimates
@@ -521,6 +601,15 @@ addWorksheet(wb, "Table 1_continuous_multiimpu")
 writeData(wb,x=descriptive_continuous,sheet = "Table 1_continuous_multiimpu",
           rowNames = F)
 ####################################################################################################
+addWorksheet(wb, "corr_r")
+writeData(wb,x=tcorrelation$r,sheet = "corr_r",
+          rowNames = F)
+addWorksheet(wb, "corr_n")
+writeData(wb,x=tcorrelation$n,sheet = "corr_n",
+          rowNames = F)
+addWorksheet(wb, "corr_p")
+writeData(wb,x=tcorrelation$P,sheet = "corr_p",
+          rowNames = F)
 saveWorkbook(wb, file=paste0("Results/Table 1",format(Sys.Date(),"_%m_%d_%Y"), ".xlsx"), overwrite = T)
 ####################################################################################################
 
@@ -537,7 +626,7 @@ table(paste0(rawanalysis_multiimpu$nonSmoker,rawanalysis_multiimpu$packyrs0,rawa
 ####################################################################################################
 subgroup_SS <- c("blackwomen","blackmen","whitewomen","whitemen","mexicanwomen","mexicanmen",
                  "overallSample","women","men","black","white","mexican","otherRE")
-SSvar_list <- c("anyoneSS","noneedmoreSS","HavefriendSS","Have5friendSS","anyonefinSS","married","SNI_1above")
+SSvar_list <- c("anyoneSS","noneedmoreSS","HavefriendSS","Have5friendSS","anyonefinSS","married","SNI_1above","SNI_2above")
 
 for (S_pp in subgroup_SS){
   #S_pp <- "otherRE"；S_pp <- "mexicanmen"
@@ -1200,7 +1289,7 @@ saveWorkbook(wb, file=paste0("Results/Table 1",
 ####################################################################################################
 ##  block 6.8: printing out tables for SS
 ####################################################################################################
-SS_tablelist <- c("anyoneSS","noneedmoreSS","HavefriendSS","Have5friendSS","anyonefinSS","married","SNI_1above")
+SS_tablelist <- c("anyoneSS","noneedmoreSS","HavefriendSS","Have5friendSS","anyonefinSS","married","SNI_1above","SNI_2above")
 SS_tablelistPP <- c("blackwomen","blackmen","whitewomen","whitemen","mexicanwomen","mexicanmen",
                     "overallSample","women","men","black","white","mexican","otherRE")
 
@@ -1224,6 +1313,7 @@ for (tt in SS_tablelist){
         print(clock_list[i])
         work <-  readxl::read_excel(paste0("Results/SS (",tt,") associated with clocks among ",S_pp," participants ",namelist,
                                            format(Sys.Date(),"_%m_%d_%Y"), ".xlsx"),sheet = i)
+        
         
         work <- as.data.frame(work[3,])
 
